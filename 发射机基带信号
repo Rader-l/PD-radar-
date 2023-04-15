@@ -1,0 +1,35 @@
+function [st_pulse, st_pulse_F, t] = radarTxBF(radar, figshow)
+% 功能：生成发射机的基带信号
+% 输入：
+%  radar：雷达基本参数
+%  figshow:图像绘制控制变量
+% 输出：
+%  st_pulse:雷达基带信号
+%  st_pulse_F:雷达基带信号频谱
+%  t:采样时间
+fcs = radar.fcs;
+dtb_tx = 1/fcs;                      %发射机基带采样间隔
+B      = radar.B;
+Tp     = radar.Tp;
+Kr     = B/Tp;                       %调频斜率
+t      = 0:dtb_tx:Tp - dtb_tx; %发射机基带信号采样时间
+st_pulse     = rectpuls(t-Tp/2,Tp).*exp(1i*pi*Kr*(t-Tp/2).^2); 
+st_pulse_F   = fft(st_pulse);       %基带信号频谱
+
+Nfft_tx  = length(st_pulse_F); %基带信号FFT点数
+delta_tx = fcs/Nfft_tx;  %基带信号频谱采样间隔
+faxis_tx = linspace(-Nfft_tx/2*delta_tx,(Nfft_tx/2-1)*delta_tx,Nfft_tx); %频率轴
+%绘制波形
+if figshow == 1 
+figure
+subplot(211)
+plot(t,real(st_pulse))
+xlabel('s')
+title('发射机基带信号实部')
+subplot(212)
+plot(faxis_tx,fftshift(abs(st_pulse_F)));
+xlabel('Hz')
+title('发射机基带信号频谱')
+xlim([-2*B,2*B]) %方便更清晰看出其频谱
+end
+end
