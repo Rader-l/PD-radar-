@@ -1,0 +1,29 @@
+function [st_RF, st_RF_F] = radarTxRF(radar, st_pulse, scr, t, figshow)
+% 功能：生成发射机射频信号
+% 输入：
+%  radar：雷达基本参数
+%  st_pulse:基带信号
+%  scr: 载波信号
+%  t：采样时间
+%  figshow: 图像绘制控制变量
+% 输出：
+%  st_RF：发射机射频信号
+%  st_RF_F：发射机射频信号频谱
+
+st_RF   = sqrt(radar.Pt).*st_pulse.*scr;           %载波信号
+st_RF_F = abs(fft(st_RF));      %载波频谱
+Nfft_tx_RF  = length(st_RF_F);  %射频信号FFT点数
+delta_tx_RF = radar.fcs/Nfft_tx_RF;   %射频信号频谱采样间隔
+faxis_tx_RF = linspace(-Nfft_tx_RF/2*delta_tx_RF,(Nfft_tx_RF/2-1)*delta_tx_RF,Nfft_tx_RF); %频率轴
+if figshow == 1
+    figure
+    subplot(211)
+    plot(t,real(st_RF))
+    xlabel('s')
+    title('发射机载波信号实部')
+    subplot(212)
+    plot(faxis_tx_RF,fftshift((st_RF_F))); %fftshift是为了方便观察其频谱
+    xlabel('Hz')
+    title('发射机射频信号频谱')
+    xlim([radar.fc-radar.B,radar.fc+radar.B]) %方便更清晰看出其频谱
+end
