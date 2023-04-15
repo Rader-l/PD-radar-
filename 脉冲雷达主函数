@@ -1,0 +1,76 @@
+%% 对脉冲多普勒雷达进行全流程仿真 
+%所谓脉冲多普勒雷达，即使用高脉冲重复频率的雷达
+%波形可选择，此版本以发射线性调频信号为例，后续补充Barker、步进频等信号
+%版本修改于2023/04/11
+
+% design by lgh ,xmut
+clear all;
+clc;
+close all;
+figshow = 1; %1为画图，0为不画
+Np = 32;
+%% Signal Choice
+signal = 1;
+% 1：LFM信号
+% 2：Barker
+% 3：步进频
+
+%% radarPara Setting
+radar = radarPara(signal, Np);
+
+%% Environment Setting
+envir = envirPara();
+
+%% TargetPara Setting
+tgt = tgtPara();
+
+%% staggedPRF Setting
+radar = staggedSetting(radar);
+
+%% Transmitter--Baseband signal
+[st_pulse, st_pulse_F, t] = radarTxBF(radar, figshow);
+
+%% Carrier Wave
+scr     = exp(1i*2*pi*radar.fc.*t); %本地产生稳定的载波信号
+
+%% Transmitter--RF signal
+[st_RF, st_RF_F] = radarTxRF(radar, st_pulse, scr, t, figshow);
+
+%% Receiver---RF IF BaseBand Signal
+[sr_RF_Np, sr_IF_Np, sr_Np] = radarRx_stag(radar, tgt, envir, figshow);
+
+%% DSP---Pulse Compress
+sr_pc = radarPC(radar, sr_Np, figshow);%此处为最后一个脉冲的脉压结果
+sr_pc_Np = radarPC_Np(radar, sr_Np);   %Np个脉冲脉压后的结果
+
+%% DSP---CFAR
+Thr = radarCFAR(radar, sr_pc, figshow);
+
+%-----------单脉冲测距-----------%
+if Np == 1
+%% DSP---rMEas
+rMeas = radarRmeas(radar, sr_pc);
+vMeas = 0;
+end
+%%-----------单脉冲测距-----------%%
+
+%------------多脉冲积累测速测距(进行MTI)--------------%
+%% DSP---MTI
+MTI_n = 1;%1阶(两脉冲对消)
+sr_pc_MTI = radarMTI_stagged(MTI_n, sr_pc_Np);
+
+%% DSP---vMeas
+[radar, vMeas1_MTI, vMeas2_MTI, vMeas3_MTI, vMeas4_MTI] = radarVmeas_MTI(radar, sr_pc_MTI, MTI_n);
+
+%% DSP---vMeas AmbiguityResolve
+vMeas_real_MTI = AmbiguityResolve_MTI(radar, vMeas1_MTI, vMeas2_MTI, vMeas3_MTI, vMeas4_MTI);
+rMeas = radarRmeas(radar, sr_pc);
+
+%% DSP---rMeas Compensate
+rMeas = rMeas + radar.Tp*radar.fc*vMeas_real_MTI/radar.B; %雷达信号处理基础P143--距离多普勒耦
+
+%%------------多脉冲积累测速测距(进行MTI)--------------%%
+
+%% Data---analyse
+rError = rMeas - tgt.R;
+vError_MTI = vMeas_real_MTI - tgt.v;
